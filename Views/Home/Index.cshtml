@@ -1,0 +1,179 @@
+﻿@{
+    ViewData["Title"] = "Home Page";
+}
+
+<form id="userForm" action="@Url.Action("Submit", "Password")" method="post"> 
+    <label for="userId">User ID:</label>
+    <input type="text" id="userId" name="userId" pattern="\d*" title="Please enter only digits" required>
+    <br><br>
+
+    <label for="date">Date:</label>
+    <input type="date" id="date" name="date" required>
+    <br><br>
+
+    <label for="time">Time:</label>
+    <input type="time" id="time" name="time" required>
+    <br><br>
+
+    <input type="checkbox" id="currentDateTime" name="currentDateTime" onchange="toggleDateTimeFields()">
+    <label for="currentDateTime">Check this if you want to take the current DateTime</label>
+    <br><br>
+
+    <input type="submit" value="Submit">
+</form>
+
+<div id="resultDiv" style="display:none;">
+    <label id="resultLabel">Your password is:</label>
+    <div id="countdownDiv">
+        <progress id="countdownBar" value="0" max="30"></progress>
+        <label id="countdownValue">Countdown Finished!</label>
+    </div>
+</div>
+
+
+<br><br>
+
+<form id="checkForm" action="@Url.Action("Check", "Password")" method="post">
+    <label for="passwordCheck">Password:</label>
+    <input type="text" id="passwordCheck" name="passwordCheck" required>
+    <br><br>
+
+    <input type="submit" value="Submit">
+    <br><br>
+
+    <label id="checkLabel"></label>
+</form>
+
+
+
+<script>
+    var userId = null;
+
+    function toggleDateTimeFields() {
+        var checkbox = document.getElementById("currentDateTime");
+        var dateField = document.getElementById("date");
+        var timeField = document.getElementById("time");
+
+        if (checkbox.checked) {
+            // .toISOString() returns a string in the format "yyyy-MM-ddTHH:mm:ss.sssZ"
+            var currentDateTime = new Date().toISOString();
+            // The first 10 characters are the date in the format "yyyy-MM-dd"
+            dateField.value = currentDateTime.slice(0, 10);
+            // The next 6 characters are the time in the format "HH:mm"
+            timeField.value = currentDateTime.slice(11, 16);
+            // The rest of the characters are irrelevant
+
+            dateField.readOnly = true;
+            timeField.readOnly = true;
+        } else {
+            dateField.readOnly = false;
+            timeField.readOnly = false;
+        }
+    }
+
+    document.getElementById("checkForm").addEventListener("submit", function (event) {
+        // We need to prevent the default behavior of the form submission
+        event.preventDefault(); 
+
+        var form = event.target;
+        var data = new FormData(form);
+        var checkLabel = document.getElementById("checkLabel");
+
+        var request = new XMLHttpRequest();
+        request.open('POST', form.action, true);
+        request.onload = function () {
+            if (request.status === 200) {
+                var response = JSON.parse(request.responseText);
+                if (response.found) {
+                    checkLabel.innerHTML = "Your password is valid! :)";
+				} else {
+                    checkLabel.innerHTML = "Your password is invalid! :(";
+				}
+			} else {
+				console.error("Error: " + request.status + " " + request.statusText);
+            }
+        };
+        request.send(data);
+    });
+
+    document.getElementById("userForm").addEventListener("submit", function (event) {
+		// We need to prevent the default behavior of the form submission
+		event.preventDefault(); 
+
+		var form = event.target;
+		var data = new FormData(form);
+		var resultLabel = document.getElementById("resultLabel");
+
+		var request = new XMLHttpRequest();
+		request.open('POST', form.action, true);
+		request.onload = function () {
+			if (request.status === 200) {
+				var response = JSON.parse(request.responseText);
+				if (response.success) {
+					resultLabel.innerHTML = "Your password is: " + response.password;
+					userId = response.userId;
+					startCountdown();
+				} else {
+					console.error("Error: " + response.error);
+				}
+            } else {
+                console.error("Error: " + request.status + " " + request.statusText);
+            }
+        };
+        request.send(data);
+    });
+
+    function startCountdown(userId) {
+        // A few things to mention here:
+        // The countdown is done on the client side.
+        // That means that the user can refresh the page and the countdown will start again.
+        // However, the password is generated on the server side, so the user will get a new password.
+        var seconds = 30;
+        var countdownValue = document.getElementById('countdownValue');
+        var countdownBar = document.getElementById('countdownBar');
+
+        var resultDiv = document.getElementById("resultDiv");
+        var resultLabel = document.getElementById("resultLabel");
+
+        var countdownInterval = setInterval(function() {
+            countdownValue.innerHTML = seconds + ' seconds remaining';
+            countdownBar.value = seconds;
+
+            if(resultDiv.style.display !== "block") {
+				resultDiv.style.display = "block";
+			}
+
+            seconds--;
+            if (seconds < 0) {
+                clearInterval(countdownInterval);
+                clearPassword();
+                countdownValue.innerHTML = 'Countdown finished';
+            }
+        }, 1000);
+	}
+
+    function clearPassword() {
+        var request = new XMLHttpRequest();
+        request.open("POST", '@Url.Action("Reset", "Home")?id=' + userId, true);
+        request.onload = function () {
+            if (request.status === 200) {
+                var response = JSON.parse(request.responseText);
+                console.log(response);
+                if (response.success) {
+                    resultLabel.innerHTML = "Your password is:";
+                    resultDiv.style.display = "none";
+                } else {
+                    console.error("Error: " + response.error);
+                }
+            }
+        };
+        request.send();
+    }
+
+    window.addEventListener('beforeunload', function(event) {
+        console.log("Clearing password");
+        clearPassword();
+    });
+
+</script>
+

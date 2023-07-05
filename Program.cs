@@ -10,6 +10,8 @@ builder.Services.AddControllersWithViews();
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlite(configuration.GetConnectionString("DefaultConnection")));
 
+builder.Services.AddScoped<IAppDbContext, AppDbContext>();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.

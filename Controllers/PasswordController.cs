@@ -6,9 +6,9 @@ namespace OneTimePasswordManager.Controllers
 {
     public class PasswordController : Controller
     {
-        private readonly AppDbContext _context;
+        private readonly IAppDbContext _context;
 
-        public PasswordController(AppDbContext context)
+        public PasswordController(IAppDbContext context)
         {
             _context = context;
         }
@@ -53,9 +53,17 @@ namespace OneTimePasswordManager.Controllers
         }
 
         [HttpPost]
-        public IActionResult Reset()
+        public IActionResult Reset(IFormCollection form)
         {
-            string userId = HttpContext.Request.Query["id"];
+            if (form == null)
+            {
+                return Json(new
+                {
+                    success = true,
+                });
+            }
+
+            string userId = form["userId"];
 
             var validPassword = _context.Passwords.FirstOrDefault(u => u.UserId == userId);
             if (validPassword != null)

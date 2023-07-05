@@ -154,11 +154,12 @@
 
     function clearPassword() {
         var request = new XMLHttpRequest();
-        request.open("POST", '@Url.Action("Reset", "Home")?id=' + userId, true);
+        var data = new FormData();
+        data.append('userId', userId);
+        request.open("POST", '@Url.Action("Reset", "Password")', true);
         request.onload = function () {
             if (request.status === 200) {
                 var response = JSON.parse(request.responseText);
-                console.log(response);
                 if (response.success) {
                     resultLabel.innerHTML = "Your password is:";
                     resultDiv.style.display = "none";
@@ -167,7 +168,7 @@
                 }
             }
         };
-        request.send();
+        request.send(data);
     }
 
     window.addEventListener('beforeunload', function(event) {

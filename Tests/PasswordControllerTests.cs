@@ -139,7 +139,7 @@ namespace Tests
 
             var jsonData = JsonConvert.DeserializeObject<JObject>(jsonString);
             Assert.IsFalse((bool)jsonData["success"]);
-            Assert.AreEqual("Unexpected Error!", ((string)jsonData["error"]).Trim());
+            Assert.That(((string)jsonData["error"]).Trim(), Is.EqualTo("Unexpected Error!"));
 
             mockDbSet.Verify(mock => mock.Remove(It.IsAny<ValidPassword>()), Times.Never);
             _mockDbContext.Verify(mock => mock.SaveChanges(), Times.Never);
@@ -179,6 +179,7 @@ namespace Tests
             jsonString = Regex.Replace(jsonString, @"(\w+)\s*=\s*([^,}]+)", @"""$1"": ""$2""");
 
             var jsonData = JsonConvert.DeserializeObject<JObject>(jsonString);
+            Assert.IsTrue((bool)jsonData["success"]);
             Assert.IsTrue((bool)jsonData["found"]);
 
             _mockDbContext.Verify(mock => mock.Passwords, Times.Once);

@@ -62,6 +62,77 @@ namespace Tests
             _mockDbContext.Verify(mock => mock.SaveChanges(), Times.Once);
         }
 
+        [Test]
+        public void Submit_WithMissingFormData_ShouldReturnErrorJson()
+        {
+            // Arrange
+            var form = new FormCollection(new Dictionary<string, Microsoft.Extensions.Primitives.StringValues>
+            {
+                // Missing form data
+                { "userId", "123456789" },
+                { "date", "2023-07-03" },
+                // { "time", "12:00" }, // Commented out intentionally to simulate missing time data
+                { "currentDateTime", "on" }
+            });
+
+            _passwordController = new PasswordController(Mock.Of<IAppDbContext>());
+
+            // Act
+            var result = _passwordController.Submit(form) as JsonResult;
+            var jsonString = result.Value.ToString();
+
+            // Wrap property names and values with quotation marks while also replacing the "=" sign with ":".
+            // Just JsonResult things...
+            jsonString = Regex.Replace(jsonString, @"(\w+)\s*=\s*([^,}]+)", @"""$1"": ""$2""");
+
+            var jsonData = JsonConvert.DeserializeObject<JObject>(jsonString);
+            Assert.IsFalse((bool)jsonData["success"]);
+            Assert.That(((string)jsonData["error"]).Trim(), Is.EqualTo("Unexpected Error!"));
+        }
+
+        [Test]
+        public void Submit_WithExistingUserId_ShouldNotAddPasswordToDatabaseAndReturnErrorJson()
+        {
+            // Arrange
+            var form = new FormCollection(new Dictionary<string, Microsoft.Extensions.Primitives.StringValues>
+            {
+                { "userId", "123456789" },
+                { "date", "2023-07-03" },
+                { "time", "12:00" },
+                { "currentDateTime", "on" }
+            });
+
+            var data = new List<ValidPassword>
+            {
+                new ValidPassword { UserId = "123456789", Password = "passwordrandom" }
+            }.AsQueryable();
+
+            var mockDbSet = new Mock<DbSet<ValidPassword>>();
+            mockDbSet.As<IQueryable<ValidPassword>>().Setup(m => m.Provider).Returns(data.Provider);
+            mockDbSet.As<IQueryable<ValidPassword>>().Setup(m => m.Expression).Returns(data.Expression);
+            mockDbSet.As<IQueryable<ValidPassword>>().Setup(m => m.ElementType).Returns(data.ElementType);
+            mockDbSet.As<IQueryable<ValidPassword>>().Setup(m => m.GetEnumerator()).Returns(data.GetEnumerator());
+
+            _mockDbContext = new Mock<IAppDbContext>();
+            _mockDbContext.Setup(m => m.Passwords).Returns(mockDbSet.Object);
+
+            _passwordController = new PasswordController(_mockDbContext.Object);
+
+            // Act
+            var result = _passwordController.Submit(form) as JsonResult;
+            var jsonString = result.Value.ToString();
+
+            // Wrap property names and values with quotation marks while also replacing the "=" sign with ":".
+            // Just JsonResult things...
+            jsonString = Regex.Replace(jsonString, @"(\w+)\s*=\s*([^,}]+)", @"""$1"": ""$2""");
+
+            var jsonData = JsonConvert.DeserializeObject<JObject>(jsonString);
+            Assert.IsFalse((bool)jsonData["success"]);
+            Assert.That(((string)jsonData["error"]).Trim(), Is.EqualTo("Unexpected Error!"));
+
+            mockDbSet.Verify(mock => mock.Add(It.IsAny<ValidPassword>()), Times.Never);
+            _mockDbContext.Verify(mock => mock.SaveChanges(), Times.Never);
+        }
 
         [Test]
         public void Reset_WithValidUserId_ShouldRemovePasswordFromDatabaseAndReturnSuccessJson()
@@ -102,6 +173,24 @@ namespace Tests
 
             mockDbSet.Verify(mock => mock.Remove(It.IsAny<ValidPassword>()), Times.Once);
             _mockDbContext.Verify(mock => mock.SaveChanges(), Times.Once);
+        }
+
+        [Test]
+        public void Reset_WithNullForm_ShouldReturnSuccessJson()
+        {
+            // Arrange
+            _passwordController = new PasswordController(Mock.Of<IAppDbContext>());
+
+            // Act
+            var result = _passwordController.Reset(null) as JsonResult;
+            var jsonString = result.Value.ToString();
+
+            // Wrap property names and values with quotation marks while also replacing the "=" sign with ":".
+            // Just JsonResult things...
+            jsonString = Regex.Replace(jsonString, @"(\w+)\s*=\s*([^,}]+)", @"""$1"": ""$2""");
+
+            var jsonData = JsonConvert.DeserializeObject<JObject>(jsonString);
+            Assert.IsTrue((bool)jsonData["success"]);
         }
 
         [Test]
@@ -181,6 +270,72 @@ namespace Tests
             var jsonData = JsonConvert.DeserializeObject<JObject>(jsonString);
             Assert.IsTrue((bool)jsonData["success"]);
             Assert.IsTrue((bool)jsonData["found"]);
+
+            _mockDbContext.Verify(mock => mock.Passwords, Times.Once);
+        }
+
+
+        [Test]
+        public void Check_WithNullPassword_ShouldReturnErrorJson()
+        {
+            // Arrange
+            var form = new FormCollection(new Dictionary<string, Microsoft.Extensions.Primitives.StringValues>
+            {
+                // Null password value
+                // { "passwordCheck", "passwordrandom" }
+            });
+
+            _passwordController = new PasswordController(Mock.Of<IAppDbContext>());
+
+            // Act
+            var result = _passwordController.Check(form) as JsonResult;
+            var jsonString = result.Value.ToString();
+
+            // Wrap property names and values with quotation marks while also replacing the "=" sign with ":".
+            // Just JsonResult things...
+            jsonString = Regex.Replace(jsonString, @"(\w+)\s*=\s*([^,}]+)", @"""$1"": ""$2""");
+
+            var jsonData = JsonConvert.DeserializeObject<JObject>(jsonString);
+            Assert.IsFalse((bool)jsonData["success"]);
+            Assert.That(((string)jsonData["error"]).Trim(), Is.EqualTo("Unexpected Error!"));
+        }
+
+        [Test]
+        public void Check_WithNonExistingPassword_ShouldReturnNotFoundJson()
+        {
+            // Arrange
+            var form = new FormCollection(new Dictionary<string, Microsoft.Extensions.Primitives.StringValues>
+            {
+                { "passwordCheck", "passwordnope" } // Non-existing password
+            });
+
+            var data = new List<ValidPassword>
+            {
+                new ValidPassword { UserId = "123456789", Password = "passwordrandom" }
+            }.AsQueryable();
+
+            var mockDbSet = new Mock<DbSet<ValidPassword>>();
+            mockDbSet.As<IQueryable<ValidPassword>>().Setup(m => m.Provider).Returns(data.Provider);
+            mockDbSet.As<IQueryable<ValidPassword>>().Setup(m => m.Expression).Returns(data.Expression);
+            mockDbSet.As<IQueryable<ValidPassword>>().Setup(m => m.ElementType).Returns(data.ElementType);
+            mockDbSet.As<IQueryable<ValidPassword>>().Setup(m => m.GetEnumerator()).Returns(data.GetEnumerator());
+
+            _mockDbContext = new Mock<IAppDbContext>();
+            _mockDbContext.Setup(m => m.Passwords).Returns(mockDbSet.Object);
+
+            _passwordController = new PasswordController(_mockDbContext.Object);
+
+            // Act
+            var result = _passwordController.Check(form) as JsonResult;
+            var jsonString = result.Value.ToString();
+
+            // Wrap property names and values with quotation marks while also replacing the "=" sign with ":".
+            // Just JsonResult things...
+            jsonString = Regex.Replace(jsonString, @"(\w+)\s*=\s*([^,}]+)", @"""$1"": ""$2""");
+
+            var jsonData = JsonConvert.DeserializeObject<JObject>(jsonString);
+            Assert.IsTrue((bool)jsonData["success"]);
+            Assert.IsFalse((bool)jsonData["found"]);
 
             _mockDbContext.Verify(mock => mock.Passwords, Times.Once);
         }

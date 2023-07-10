@@ -17,12 +17,22 @@ namespace OneTimePasswordManager.Controllers
         public IActionResult Submit(IFormCollection form)
         {
             // Access the submitted form data
-            string userId = form["userId"];
-            string date = form["date"];
-            string time = form["time"];
+            string? userId = form["userId"];
+            string? date = form["date"];
+            string? time = form["time"];
             bool currentDateTime = form["currentDateTime"] == "on";
 
             Console.WriteLine(userId + " " + date + " " + time + " " + currentDateTime);
+
+            // If any of the form data is missing, return an error.
+            if (userId == null || date == null || time == null)
+            {
+                return Json(new
+                {
+                    success = false,
+                    error = "Unexpected Error!"
+                });
+            }
 
             // A few things to note here:
             // 1. The password is generated using the SHA1 algorithm.
@@ -63,7 +73,7 @@ namespace OneTimePasswordManager.Controllers
                 });
             }
 
-            string userId = form["userId"];
+            string? userId = form["userId"];
 
             var validPassword = _context.Passwords.FirstOrDefault(u => u.UserId == userId);
             if (validPassword != null)
@@ -88,19 +98,30 @@ namespace OneTimePasswordManager.Controllers
         [HttpPost]
         public IActionResult Check(IFormCollection form)
         {
-            string password = form["passwordCheck"];
+            string? password = form["passwordCheck"];
+
+            if (password == null)
+            {
+                return Json(new
+                {
+                    success = false,
+                    error = "Unexpected Error!"
+                });
+            }
 
             var validPassword = _context.Passwords.FirstOrDefault(u => u.Password == password);
             if (validPassword != null)
             {
                 return Json(new
                 {
+                    success = true,
                     found = true
                 });
             }
 
             return Json(new
             {
+                success = true,
                 found = false
             });
         }
